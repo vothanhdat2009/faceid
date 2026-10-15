@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#14213d">
-<title>Nhận diện khuôn mặt</title>
+<title>Giám sát camera gia đình</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&display=swap" rel="stylesheet">
@@ -66,31 +66,150 @@
   button.small { white-space:nowrap; min-height:36px; padding:4px 12px; font-size:14px; background:var(--ink); }
   .badge { display:inline-block; background:var(--err); color:#fff; font-size:12px; font-weight:600; padding:1px 8px; border-radius:99px; margin-left:4px; }
   #log { margin-top:6px; font-size:13px; color:var(--muted); }
+
+  /* ---- Giám sát từ xa ---- */
+  input[type="password"], select { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; color:inherit; }
+  select { width:auto; min-height:44px; }
+  input[readonly] { background:#f3f6fa; }
+  .lbl { display:block; font-size:14px; font-weight:600; margin:10px 0 4px; }
+  .pill { display:inline-block; margin:0 0 10px; padding:4px 12px 4px 26px; border-radius:99px; background:#e6ebf2; font-size:14px; font-weight:600; position:relative; }
+  .pill::before { content:""; position:absolute; left:10px; top:11px; width:9px; height:9px; border-radius:50%; background:var(--idle); }
+  .pill[data-kind="busy"]::before { background:var(--warn); }
+  .pill[data-kind="ok"]::before { background:var(--ok); }
+  .pill[data-kind="err"]::before { background:var(--err); }
+  .seg { display:flex; gap:8px; margin-bottom:6px; }
+  .seg button { flex:1; background:#e6ebf2; color:var(--ink); }
+  .seg button[aria-pressed="true"] { background:var(--accent); color:#fff; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 4px; }
+  .btns button { flex:1 1 160px; }
+  #roomMsg { min-height:22px; font-size:14px; margin:8px 0 0; }
+  #roomMsg.ok { color:var(--ok); } #roomMsg.err { color:var(--err); }
+  details.adv { margin-top:10px; font-size:14px; }
+  details.adv summary { cursor:pointer; font-weight:600; }
+  details.adv .row { margin-top:6px; }
+  details.panel summary { cursor:pointer; font-weight:700; font-size:17px; }
+  details.panel ol { margin:10px 0 0; padding-left:20px; font-size:14px; }
+  details.panel li { display:list-item; border:0; padding:3px 0; }
+  details.panel h3 { margin:12px 0 0; font-size:15px; }
+  #remote { object-fit:contain; background:#000; }
+  #rstatus { position:absolute; left:12px; bottom:12px; max-width:calc(100% - 24px); background:rgba(13,21,36,.85); color:#fff; padding:6px 12px; border-radius:8px; font-size:14px; line-height:1.4; }
+  #rstatus:empty { display:none; }
+  #rAlert { position:absolute; left:12px; right:12px; top:12px; z-index:2; background:var(--err); color:#fff; padding:8px 12px; border-radius:8px; font-weight:700; font-size:15px; line-height:1.4; }
+  body.viewing #stage, body.viewing .controls, body.viewing .cam-only { display:none !important; }
+  .controls select { flex:none; }
+  li.ev { justify-content:flex-start; flex-wrap:nowrap; align-items:flex-start; }
+  li.ev .thumb { width:56px; height:42px; object-fit:cover; border-radius:6px; flex:none; cursor:pointer; }
+  li.ev .thumb.big { position:fixed; inset:10% 5%; width:90%; height:80%; object-fit:contain; background:#000; z-index:50; border-radius:10px; }
+  #ntfyInfo, #vNtfy { overflow-wrap:anywhere; }
   @media (prefers-reduced-motion: reduce) { * { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>Nhận diện khuôn mặt</h1>
-    <p>Chạy hoàn toàn trong trình duyệt. Dữ liệu khuôn mặt chỉ lưu trên thiết bị của bạn.</p>
+    <h1>Giám sát camera gia đình</h1>
+    <p>Nhận diện khuôn mặt chạy ngay trên thiết bị camera. Dữ liệu khuôn mặt chỉ lưu trên thiết bị đó. Hình ảnh chỉ được gửi đi khi bạn tạo phòng giám sát, và chỉ tới thiết bị đã nhập đúng mật khẩu.</p>
   </header>
 
   <div>
     <section class="stage" id="stage" aria-label="Hình ảnh từ camera">
       <video id="video" autoplay muted playsinline></video>
       <canvas id="overlay"></canvas>
-      <div id="status" role="status" aria-live="polite" data-kind="busy">Đang tải mô hình…</div>
+      <div id="status" role="status" aria-live="polite" data-kind="idle">Camera đang tắt. Bấm “Bật camera” để bắt đầu.</div>
       <div id="alert" role="alert" hidden></div>
     </section>
     <div class="controls">
-      <button id="camBtn" disabled>Đang tải…</button>
-      <p class="hint">Camera chỉ xử lý ngay trên máy, không gửi hình ảnh đi đâu.</p>
+      <button id="camBtn">Bật camera</button>
+      <select id="facing" aria-label="Chọn camera trước hoặc sau"><option value="user">Camera trước</option><option value="environment">Camera sau</option></select>
+      <p class="hint">Nhận diện chạy ngay trên máy này. Camera chỉ bật khi bạn bấm nút. Lần đầu bật sẽ tải mô hình nhận diện (vài MB).</p>
     </div>
+    <section class="stage" id="remoteStage" aria-label="Hình ảnh từ camera ở xa" hidden>
+      <video id="remote" autoplay muted playsinline></video>
+      <div id="rstatus" role="status" aria-live="polite" data-kind="busy"></div>
+      <div id="rAlert" role="alert" hidden></div>
+    </section>
   </div>
 
   <div class="side">
-    <section class="panel">
+    <section class="panel" id="roomPanel">
+      <h2>Giám sát từ xa</h2>
+      <p id="roomState" class="pill" data-kind="idle" role="status" aria-live="polite">Chưa kết nối</p>
+      <div class="seg" role="group" aria-label="Vai trò của máy này">
+        <button type="button" id="tabHost" aria-pressed="true">Máy này là camera</button>
+        <button type="button" id="tabView" aria-pressed="false">Máy này để xem</button>
+      </div>
+
+      <div id="hostForm">
+        <label class="lbl" for="hCode">Mã phòng</label>
+        <div class="row"><input type="text" id="hCode" readonly autocomplete="off"><button type="button" id="hNewCode" class="small">Mã mới</button></div>
+        <label class="lbl" for="hPass">Mật khẩu phòng (ít nhất 8 ký tự)</label>
+        <div class="row"><input type="password" id="hPass" autocomplete="new-password" maxlength="64"><button type="button" id="hGen" class="small">Tạo ngẫu nhiên</button></div>
+        <label class="check"><input type="checkbox" id="hRemember"> <span>Ghi nhớ phòng trên thiết bị camera này. Máy chỉ lưu khoá dẫn xuất từ mật khẩu, không lưu nguyên văn, nhưng ai lấy được dữ liệu trình duyệt của máy này vẫn có thể mở phòng.</span></label>
+        <div class="btns">
+          <button type="button" id="hStart">Tạo phòng và bật camera</button>
+          <button type="button" id="hStop" class="stop" disabled>Ngắt kết nối và tắt camera</button>
+        </div>
+        <label class="lbl" for="hLink">Link cho người xem (chưa gồm mật khẩu)</label>
+        <div class="row"><input type="text" id="hLink" readonly><button type="button" id="hCopy" class="small" disabled>Sao chép</button></div>
+      </div>
+
+      <div id="viewForm" hidden>
+        <label class="lbl" for="vCode">Mã phòng</label>
+        <input type="text" id="vCode" autocomplete="off" autocapitalize="none" maxlength="20">
+        <label class="lbl" for="vPass">Mật khẩu phòng</label>
+        <input type="password" id="vPass" autocomplete="off" maxlength="64">
+        <div class="btns">
+          <button type="button" id="vStart">Tham gia phòng</button>
+          <button type="button" id="vStop" class="stop" disabled>Ngắt kết nối</button>
+        </div>
+        <p id="vNtfy" class="hint"></p>
+      </div>
+
+      <p id="roomMsg" role="status"></p>
+      <button type="button" id="notifBtn" class="small" style="margin-top:6px">Bật thông báo trên máy này</button>
+      <p id="notifMsg" class="hint" style="margin-top:6px"></p>
+
+      <details class="adv">
+        <summary>Nâng cao: thông báo nền (ntfy) và máy chủ TURN</summary>
+        <label class="check"><input type="checkbox" id="ntfyOn"> <span>Gửi cảnh báo dạng văn bản (không kèm ảnh) qua máy chủ công cộng ntfy.sh để nhận thông báo cả khi đã đóng trang. Chỉ gửi khi phòng đang mở. Ai biết tên chủ đề đều đọc được tin; tên được tạo ngẫu nhiên và chỉ gửi cho thiết bị đã xác thực.</span></label>
+        <p id="ntfyInfo" class="hint"></p>
+        <p class="hint" style="margin-top:10px">TURN giúp kết nối được khi hai máy ở hai mạng khó thông nhau (ví dụ mạng di động). PeerJS đã ngừng TURN miễn phí, nên nếu khác mạng mà không lên hình, bạn cần tự nhập một máy chủ TURN. Cả hai máy đều cần nhập giống nhau.</p>
+        <label class="lbl" for="turnUrl">Địa chỉ TURN (cách nhau bằng dấu phẩy)</label>
+        <input type="text" id="turnUrl" placeholder="turn:ten-may-chu:443?transport=tcp" autocomplete="off">
+        <label class="lbl" for="turnUser">Tên đăng nhập TURN</label>
+        <input type="text" id="turnUser" autocomplete="off">
+        <label class="lbl" for="turnPass">Mật khẩu TURN</label>
+        <input type="password" id="turnPass" autocomplete="off">
+        <div class="btns"><button type="button" id="netSave" class="small">Lưu cấu hình TURN</button></div>
+      </details>
+    </section>
+
+    <details class="panel" open>
+      <summary>Hướng dẫn kết nối từng bước</summary>
+      <h3>Trên điện thoại làm camera</h3>
+      <ol>
+        <li>Mở trang này bằng Chrome qua địa chỉ <strong>https://</strong>.</li>
+        <li>Ở mục “Giám sát từ xa”, chọn <strong>Máy này là camera</strong>. Bấm “Tạo ngẫu nhiên” để có mật khẩu và ghi lại mật khẩu đó.</li>
+        <li>Bấm <strong>Tạo phòng và bật camera</strong>, rồi bấm “Cho phép” khi Chrome hỏi quyền camera. Chờ trạng thái chuyển sang “Phòng đã mở”.</li>
+        <li>Đặt điện thoại cố định, cắm sạc, <strong>để màn hình sáng và giữ trang này mở</strong>. Khoá màn hình hoặc chuyển ứng dụng có thể làm camera ngừng.</li>
+        <li>Thêm khuôn mặt người nhà ở các mục bên dưới, trên chính máy này, để nhận diện được người quen.</li>
+        <li>Bấm “Sao chép” ở ô link và gửi cho người xem. Gửi <strong>mật khẩu bằng một kênh khác</strong>.</li>
+      </ol>
+      <h3>Trên điện thoại để xem</h3>
+      <ol>
+        <li>Mở link được gửi (hoặc mở trang này rồi chọn <strong>Máy này để xem</strong> và nhập mã phòng).</li>
+        <li>Nhập mật khẩu, bấm <strong>Tham gia phòng</strong>. Nếu máy đang bật camera, hãy tắt camera trước.</li>
+        <li>Bấm “Bật thông báo trên máy này” để nhận cảnh báo khi trang chạy nền. Muốn nhận cả khi đã đóng trang, bật ntfy ở mục Nâng cao.</li>
+      </ol>
+      <h3>Khi không lên hình</h3>
+      <ol>
+        <li>Kiểm tra camera còn mở và trang camera còn sáng màn hình.</li>
+        <li>Khác mạng mà vẫn không lên: cấu hình TURN ở mục Nâng cao trên cả hai máy.</li>
+        <li>Bấm “Ngắt kết nối” rồi tham gia lại.</li>
+      </ol>
+    </details>
+
+    <section class="panel cam-only">
       <h2>Thêm người mới</h2>
       <p class="hint" style="margin-bottom:10px">Nhìn thẳng vào camera, nhập tên rồi bấm lưu. Lưu 3–5 lần, xoay mặt nhẹ và đổi ánh sáng một chút để nhận diện ổn định hơn (tối đa 10 mẫu mỗi người).</p>
       <div class="row">
@@ -101,27 +220,32 @@
       <p id="msg" role="status"></p>
     </section>
 
-    <section class="panel">
+    <section class="panel cam-only">
       <h2>Danh sách đã lưu</h2>
       <ul id="list" style="margin-top:0"></ul>
     </section>
 
-    <section class="panel">
+    <section class="panel cam-only">
       <h2>Độ khắt khe khi nhận diện</h2>
       <div class="tune-head"><span id="thLabel"></span><strong id="thValue"></strong></div>
       <input type="range" id="threshold" min="0.35" max="0.65" step="0.01" aria-label="Ngưỡng nhận diện">
       <p class="hint" style="margin-top:6px">Kéo về trái: chặt hơn, ít nhận nhầm người lạ nhưng dễ bỏ sót. Kéo về phải: dễ nhận hơn nhưng dễ nhầm.</p>
     </section>
 
-    <section class="panel">
+    <section class="panel cam-only">
       <h2>Báo động</h2>
       <label class="check"><input type="checkbox" id="alertBlocked"> <span>Báo khi thấy người trong danh sách đen</span></label>
       <label class="check"><input type="checkbox" id="alertStranger"> <span>Báo khi thấy người lạ</span></label>
-      <label class="check"><input type="checkbox" id="alertSound"> <span>Phát âm báo và rung (nếu máy hỗ trợ)</span></label>
+      <label class="check"><input type="checkbox" id="alertSnap"> <span>Chụp ảnh nhỏ tại thời điểm cảnh báo (lưu trong lịch sử trên máy camera và gửi cho thiết bị xem)</span></label>
+    </section>
+
+    <section class="panel">
+      <h2>Lịch sử sự kiện</h2>
+      <label class="check"><input type="checkbox" id="alertSound"> <span>Phát âm báo và rung khi có cảnh báo (nếu máy hỗ trợ)</span></label>
       <button id="alertTest" class="small" type="button" style="margin-top:8px">Thử âm báo</button>
-      <p class="hint" style="margin-top:6px">Trình duyệt chỉ phát âm thanh sau khi bạn chạm hoặc bấm vào trang ít nhất một lần.</p>
-      <h3 style="margin:14px 0 0; font-size:15px">Cảnh báo gần đây</h3>
+      <p class="hint" style="margin-top:6px">Trình duyệt chỉ phát âm thanh sau khi bạn chạm hoặc bấm vào trang ít nhất một lần. Chạm vào ảnh nhỏ để phóng to.</p>
       <ul id="log"></ul>
+      <button id="clearLog" class="small" type="button" style="margin-top:8px">Xoá lịch sử trên máy này</button>
     </section>
 
   </div>
@@ -129,11 +253,12 @@
 
 <footer>
   <p>Kết quả chỉ mang tính tham khảo và có thể sai khi thiếu sáng, ngược sáng, che mặt hoặc nghiêng mặt nhiều. Không dùng để xác thực bảo mật hay đưa ra quyết định quan trọng.</p>
-  <p>Ứng dụng chỉ lưu vector đặc trưng (128 số), không lưu ảnh, trong localStorage của trình duyệt này. Xoá dữ liệu trình duyệt sẽ làm mất danh sách.</p>
-  <p>Báo động chỉ hoạt động khi trang đang mở và hiển thị trên màn hình, không thay thế hệ thống an ninh thật. Người lạ hoặc người trong danh sách đen có thể bị báo nhầm hoặc bỏ sót khi thiếu sáng, che mặt, nghiêng mặt hay đứng xa.</p>
+  <p>Ứng dụng lưu vector đặc trưng khuôn mặt (128 số, không lưu ảnh khuôn mặt) và, nếu bật, ảnh nhỏ của các cảnh báo gần đây trong localStorage của trình duyệt này. Xoá dữ liệu trình duyệt sẽ làm mất danh sách. Video không được ghi hay lưu lên máy chủ nào.</p>
+  <p>Báo động và phát hình chỉ hoạt động khi trang camera đang mở và màn hình không khoá, không thay thế hệ thống an ninh thật. Kết nối giữa hai máy là WebRTC (mã hoá), nhưng cần máy chủ trung gian để bắt tay và có thể cần TURN khi khác mạng. Người lạ hoặc người trong danh sách đen có thể bị báo nhầm hoặc bỏ sót khi thiếu sáng, che mặt, nghiêng mặt hay đứng xa.</p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 'use strict';
 
@@ -161,7 +286,7 @@ let db = loadDb();                 // mảng { name, descriptors } với mỗi d
 let index = [];                    // bản Float32Array của db để so khớp nhanh
 let threshold = loadThreshold();
 let opts = null;                   // tùy chọn bộ phát hiện, tạo sau khi tải thư viện
-let modelsReady = false, loadingModels = false;
+let modelsReady = false, loadingModels = false, modelsFailed = false;
 let stream = null, cameraOn = false, starting = false;
 let session = 0;                   // tăng mỗi lần bật/tắt để dừng vòng lặp cũ
 let failCount = 0;
@@ -303,7 +428,7 @@ function updateUi() {
   saveBtn.disabled = !cameraOn;
   camBtn.classList.toggle('stop', cameraOn);
   if (loadingModels) { camBtn.textContent = 'Đang tải mô hình…'; camBtn.disabled = true; }
-  else if (!modelsReady) { camBtn.textContent = 'Tải lại mô hình'; camBtn.disabled = false; }
+  else if (!modelsReady && modelsFailed) { camBtn.textContent = 'Tải lại mô hình'; camBtn.disabled = false; }
   else if (starting) { camBtn.textContent = 'Đang mở camera…'; camBtn.disabled = true; }
   else { camBtn.textContent = cameraOn ? 'Tắt camera' : 'Bật camera'; camBtn.disabled = false; }
 }
@@ -314,7 +439,7 @@ function setFaceCount(n) {
 /* ---------- Tải mô hình ---------- */
 async function loadModels() {
   if (modelsReady || loadingModels) return modelsReady;
-  loadingModels = true; updateUi();
+  loadingModels = true; modelsFailed = false; updateUi();
   try {
     if (typeof faceapi === 'undefined') throw new Error('Không tải được thư viện face-api');
     let done = 0;
@@ -327,7 +452,7 @@ async function loadModels() {
     modelsReady = true;
     setStatus('Mô hình đã sẵn sàng', 'ok');
   } catch (e) {
-    console.error(e);
+    console.error(e); modelsFailed = true;
     setStatus('Không tải được mô hình nhận diện. Kiểm tra kết nối mạng rồi bấm “Tải lại mô hình”.', 'err');
   } finally {
     loadingModels = false; updateUi();
@@ -363,7 +488,7 @@ async function startCamera() {
   setStatus('Đang mở camera…', 'busy');
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      video: { facingMode: camFacing(), width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false
     });
     video.srcObject = stream;
@@ -388,6 +513,7 @@ async function startCamera() {
   }
 }
 function stopCamera() {
+  if (typeof hostShutdown === 'function') hostShutdown('Camera đã tắt nên phòng đã đóng');
   session++;                      // làm vòng lặp đang chạy tự dừng
   cameraOn = false;
   releaseStream();
@@ -476,7 +602,7 @@ function saveFace() {
 /* ---------- Báo động ---------- */
 const alarmBanner = $('alert');
 function loadAlertCfg() {
-  const def = { blocked: true, stranger: true, sound: true };
+  const def = { blocked: true, stranger: true, sound: true, snap: true };
   try { return Object.assign(def, JSON.parse(localStorage.getItem(ALERT_KEY))); } catch { return def; }
 }
 function ensureAudio() {
@@ -499,27 +625,6 @@ function beep() {
     osc.start(start); osc.stop(end);
   }
 }
-function renderLog() {
-  const ul = $('log');
-  ul.innerHTML = '';
-  if (!alertLog.length) {
-    const li = document.createElement('li');
-    li.style.borderTop = '0';
-    li.textContent = 'Chưa có cảnh báo nào.';
-    ul.appendChild(li);
-    return;
-  }
-  for (const e of alertLog) {
-    const li = document.createElement('li');
-    li.textContent = `${e.time} – ${e.text}`;
-    ul.appendChild(li);
-  }
-}
-function logEvent(text) {
-  alertLog.unshift({ time: new Date().toLocaleTimeString('vi-VN'), text });
-  if (alertLog.length > 8) alertLog.pop();
-  renderLog();
-}
 function clearAlarm() {
   stage.classList.remove('alarm');
   alarmBanner.hidden = true;
@@ -540,7 +645,7 @@ function handleAlerts(results) {
   const now = Date.now();
   let fire = false;
   for (const [key, label] of flagged) {
-    if (now - (lastAlertAt[key] || 0) >= ALERT_COOLDOWN) { lastAlertAt[key] = now; logEvent(label); fire = true; }
+    if (now - (lastAlertAt[key] || 0) >= ALERT_COOLDOWN) { lastAlertAt[key] = now; logEvent(label, key === 'unknown' ? 'stranger' : 'blocked'); fire = true; }
   }
   if (fire && alertCfg.sound) {
     beep();
@@ -613,6 +718,512 @@ slider.oninput = () => {
   try { localStorage.setItem(THRESH_KEY, String(threshold)); } catch {}
 };
 
+/* ====================================================================
+   GIÁM SÁT TỪ XA: WebRTC (PeerJS Cloud làm signaling) + xác thực mật khẩu
+   - Máy camera: nhận diện tại chỗ, phát hình chỉ cho thiết bị đã xác thực.
+   - Máy xem: nhận hình + cảnh báo qua kênh dữ liệu WebRTC.
+   ==================================================================== */
+const ROOM_KEY = 'cam-room-v1';      // { code, keyHex } phòng camera (chỉ khi chọn ghi nhớ)
+const VIEW_KEY = 'cam-view-v1';      // mã phòng xem gần nhất (KHÔNG lưu mật khẩu)
+const NET_KEY = 'cam-net-v1';        // cấu hình TURN, ntfy
+const EVT_KEY = 'face-events-v1';    // lịch sử sự kiện (kèm ảnh nhỏ)
+const FACING_KEY = 'cam-facing-v1';
+const PEER_PREFIX = 'fcam-';
+const MAX_VIEWERS = 2, AUTH_TIMEOUT = 10000, PING_MS = 5000, DEAD_MS = 20000;
+const MAX_EVENTS = 30, PERSIST_IMG_EVENTS = 15;
+const NTFY_URL = 'https://ntfy.sh/', NTFY_MIN_GAP = 60000;
+const CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
+const PASS_CHARS = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const remote = $('remote');
+let host = null;        // phiên máy camera
+let view = null;        // phiên máy xem
+let roomBusy = false;
+let rAlertT = null, lastNtfy = 0, wakeLock = null;
+
+function loadJson(k, def) { try { const v = JSON.parse(localStorage.getItem(k)); return v && typeof v === 'object' ? v : def; } catch { return def; } }
+function saveJson(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+let net = Object.assign({ turnUrl: '', turnUser: '', turnPass: '', ntfy: false, ntfyTopic: '' }, loadJson(NET_KEY, {}));
+
+/*CRYPTO-START*/
+const enc = new TextEncoder();
+const toHex = b => Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, '0')).join('');
+const fromHex = h => Uint8Array.from(h.match(/../g) || [], x => parseInt(x, 16));
+function randStr(n, chars) {
+  const lim = 256 - (256 % chars.length);
+  let out = '';
+  while (out.length < n) {
+    for (const x of crypto.getRandomValues(new Uint8Array(n * 2))) if (x < lim && out.length < n) out += chars[x % chars.length];
+  }
+  return out;
+}
+// Khoá dẫn xuất từ mật khẩu + mã phòng. Mật khẩu không bao giờ được gửi đi.
+async function deriveKeyHex(pw, code) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode('face-cam:' + code), iterations: 150000 }, base, 256);
+  return toHex(bits);
+}
+async function hmacHex(keyHex, msg) {
+  const k = await crypto.subtle.importKey('raw', fromHex(keyHex), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return toHex(await crypto.subtle.sign('HMAC', k, enc.encode(msg)));
+}
+function safeEq(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+/*CRYPTO-END*/
+
+function iceConfig() {
+  const servers = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' }];
+  const urls = (net.turnUrl || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (urls.length) servers.push({ urls, username: net.turnUser || undefined, credential: net.turnPass || undefined });
+  return { iceServers: servers };
+}
+const secureOk = () => window.isSecureContext && window.crypto && crypto.subtle;
+const shareLink = code => location.href.split('#')[0] + '#room=' + code;
+const validCode = c => /^[a-z0-9]{8,20}$/.test(c);
+
+/* ---------- Giao diện phòng ---------- */
+function setRoomState(text, kind) { const el = $('roomState'); el.textContent = text; el.dataset.kind = kind || 'idle'; }
+function roomMsg(text, kind) { const el = $('roomMsg'); el.textContent = text; el.className = kind || ''; }
+function rstat(text, kind) { const el = $('rstatus'); el.textContent = text; el.dataset.kind = kind || 'busy'; }
+function showTab(which) {
+  $('hostForm').hidden = which !== 'host'; $('viewForm').hidden = which !== 'view';
+  $('tabHost').setAttribute('aria-pressed', String(which === 'host'));
+  $('tabView').setAttribute('aria-pressed', String(which === 'view'));
+}
+function updateRoomUi() {
+  const hosting = !!host, viewing = !!view, idle = !hosting && !viewing && !roomBusy;
+  $('hStart').disabled = !idle; $('hStop').disabled = !hosting;
+  $('hNewCode').disabled = !idle; $('hGen').disabled = !idle; $('hPass').disabled = !idle; $('hRemember').disabled = !idle;
+  $('vStart').disabled = !idle; $('vStop').disabled = !viewing;
+  $('vCode').disabled = !idle; $('vPass').disabled = !idle;
+  $('tabHost').disabled = !idle; $('tabView').disabled = !idle;
+  $('hLink').value = hosting ? shareLink(host.code) : ''; $('hCopy').disabled = !hosting;
+  document.body.classList.toggle('viewing', viewing);
+  $('remoteStage').hidden = !viewing;
+}
+
+/* ---------- Giữ màn hình sáng (máy camera) ---------- */
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch (e) { console.warn('wakeLock', e); }
+}
+
+/* ---------- Lịch sử sự kiện ---------- */
+function cleanEvent(e) {
+  if (!e || typeof e !== 'object' || typeof e.text !== 'string' || !Number.isFinite(e.ts)) return null;
+  const img = typeof e.img === 'string' && e.img.startsWith('data:image/jpeg;base64,') && e.img.length < 200000 ? e.img : null;
+  return { id: String(e.id || e.ts).slice(0, 24), ts: e.ts, kind: e.kind === 'blocked' ? 'blocked' : e.kind === 'stranger' ? 'stranger' : 'info', text: e.text.slice(0, 120), img };
+}
+function loadEvents() { const a = loadJson(EVT_KEY, []); return Array.isArray(a) ? a.map(cleanEvent).filter(Boolean).slice(0, MAX_EVENTS) : []; }
+let eventLog = loadEvents();
+function persistEvents() {
+  if (view) return;   // ở chế độ xem: không ghi đè lịch sử của máy này
+  let list = eventLog.map((e, i) => i < PERSIST_IMG_EVENTS ? e : Object.assign({}, e, { img: null }));
+  if (!saveJson(EVT_KEY, list)) saveJson(EVT_KEY, list.map(e => Object.assign({}, e, { img: null })));
+}
+function renderLog() {
+  const ul = $('log');
+  ul.innerHTML = '';
+  if (!eventLog.length) {
+    const li = document.createElement('li');
+    li.style.borderTop = '0';
+    li.textContent = 'Chưa có sự kiện nào.';
+    ul.appendChild(li);
+    return;
+  }
+  for (const e of eventLog) {
+    const li = document.createElement('li');
+    li.className = 'ev';
+    if (e.img) {
+      const im = document.createElement('img');
+      im.src = e.img; im.alt = 'Ảnh chụp lúc cảnh báo'; im.className = 'thumb';
+      im.onclick = () => im.classList.toggle('big');
+      li.appendChild(im);
+    }
+    const t = document.createElement('span');
+    t.textContent = `${new Date(e.ts).toLocaleString('vi-VN')} – ${e.text}`;
+    li.appendChild(t);
+    ul.appendChild(li);
+  }
+}
+function snapshot() {
+  try {
+    if (!video.videoWidth) return null;
+    const w = 320, h = Math.round(w * video.videoHeight / video.videoWidth);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(video, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', 0.6);
+  } catch { return null; }
+}
+// Được gọi từ handleAlerts khi có người lạ / người trong danh sách đen (máy camera).
+function logEvent(text, kind) {
+  const ev = cleanEvent({ id: Date.now().toString(36) + randStr(3, 'abcdefghijklmnopqrstuvwxyz'), ts: Date.now(), kind, text, img: alertCfg.snap ? snapshot() : null });
+  eventLog.unshift(ev);
+  if (eventLog.length > MAX_EVENTS) eventLog.length = MAX_EVENTS;
+  persistEvents(); renderLog();
+  hostBroadcast({ t: 'alert', ev });
+  pushNtfy(ev);
+}
+
+/* ---------- Thông báo nền qua ntfy (tuỳ chọn, chỉ văn bản) ---------- */
+async function pushNtfy(ev) {
+  if (!host || !net.ntfy || !net.ntfyTopic) return;
+  const now = Date.now();
+  if (now - lastNtfy < NTFY_MIN_GAP) return;
+  lastNtfy = now;
+  try {
+    const r = await fetch(NTFY_URL, { method: 'POST', body: JSON.stringify({
+      topic: net.ntfyTopic, title: 'Cảnh báo camera', priority: 4, tags: ['warning'],
+      message: `${ev.text} lúc ${new Date(ev.ts).toLocaleTimeString('vi-VN')}`
+    }) });
+    if (!r.ok) roomMsg(`Gửi thông báo nền qua ntfy thất bại (mã ${r.status}).`, 'err');
+  } catch (e) { console.warn('ntfy', e); roomMsg('Không gửi được thông báo nền qua ntfy (mất mạng hoặc bị chặn).', 'err'); }
+}
+function ntfyLink(topic) { return /^[A-Za-z0-9_-]{8,64}$/.test(topic || '') ? 'https://ntfy.sh/' + topic : null; }
+function renderNtfyInfo() {
+  const el = $('ntfyInfo');
+  el.textContent = '';
+  if (!net.ntfy || !net.ntfyTopic) return;
+  el.append('Chủ đề ntfy: ');
+  const b = document.createElement('strong'); b.textContent = net.ntfyTopic; el.append(b, '. Thiết bị xem sẽ tự nhận chủ đề này sau khi nhập đúng mật khẩu.');
+}
+function showNtfyForViewer(topic) {
+  const el = $('vNtfy'); el.textContent = '';
+  const link = ntfyLink(topic);
+  if (!link) return;
+  el.append('Muốn nhận cảnh báo cả khi đóng trang: cài ứng dụng ntfy rồi đăng ký chủ đề ');
+  const b = document.createElement('strong'); b.textContent = topic;
+  const a = document.createElement('a'); a.href = link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'mở trang ntfy';
+  el.append(b, ' (hoặc ', a, ').');
+}
+
+/* ---------- Thông báo trên trình duyệt (máy xem) ---------- */
+function notifMsg(t, kind) { const el = $('notifMsg'); el.textContent = t; el.style.color = kind === 'err' ? 'var(--err)' : kind === 'ok' ? 'var(--ok)' : ''; }
+async function enableNotifs() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return notifMsg('Trình duyệt này không hỗ trợ thông báo.', 'err');
+  try {
+    const p = await Notification.requestPermission();
+    if (p !== 'granted') return notifMsg('Chưa được cấp quyền thông báo. Bật lại ở cài đặt trang (biểu tượng ổ khoá cạnh địa chỉ).', 'err');
+    await navigator.serviceWorker.register('sw.js');
+    notifMsg('Đã bật. Thông báo chỉ hiện khi trang còn mở trong nền; muốn nhận khi đã đóng trang hãy dùng ntfy.', 'ok');
+  } catch (e) { notifMsg('Không bật được thông báo: ' + (e.message || e), 'err'); }
+}
+async function notifyLocal(ev) {
+  if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) await reg.showNotification('⚠ ' + ev.text, { body: new Date(ev.ts).toLocaleTimeString('vi-VN'), tag: 'face-alert', renotify: true, vibrate: [200, 100, 200] });
+  } catch (e) { console.warn('notify', e); }
+}
+
+/* ---------- MÁY CAMERA ---------- */
+function camFacing() { return { ideal: $('facing').value === 'environment' ? 'environment' : 'user' }; }
+async function hostStart() {
+  if (host || view || roomBusy) return;
+  if (!secureOk()) return roomMsg('Cần mở trang qua HTTPS (hoặc localhost) để dùng phòng giám sát.', 'err');
+  if (typeof Peer === 'undefined') return roomMsg('Không tải được thư viện kết nối (PeerJS). Kiểm tra mạng rồi tải lại trang.', 'err');
+  const code = $('hCode').value.trim(), pw = $('hPass').value;
+  const saved = loadJson(ROOM_KEY, null);
+  const savedOk = saved && saved.code === code && /^[0-9a-f]{64}$/.test(saved.keyHex || '');
+  if (!validCode(code)) return roomMsg('Mã phòng không hợp lệ. Bấm “Mã mới”.', 'err');
+  if (!pw && !savedOk) return roomMsg('Nhập mật khẩu (ít nhất 8 ký tự) hoặc bấm “Tạo ngẫu nhiên”.', 'err');
+  if (pw && pw.length < 8) return roomMsg('Mật khẩu cần ít nhất 8 ký tự.', 'err');
+  roomBusy = true; updateRoomUi(); roomMsg('Đang chuẩn bị…');
+  try {
+    ensureAudio();
+    const keyHex = pw ? await deriveKeyHex(pw, code) : saved.keyHex;
+    if (!cameraOn) {
+      if (!modelsReady && !(await loadModels())) throw new Error('Chưa tải được mô hình nhận diện.');
+      await startCamera();
+      if (!cameraOn) throw new Error('Chưa bật được camera. Xem thông báo trên khung hình.');
+    }
+    if ($('hRemember').checked) saveJson(ROOM_KEY, { code, keyHex }); else { try { localStorage.removeItem(ROOM_KEY); } catch {} }
+    host = { code, keyHex, peer: null, conns: new Map(), calls: new Map(), fails: [], lockUntil: 0, retries: 0, retryT: null, hb: setInterval(hostHeartbeat, PING_MS) };
+    $('hPass').value = ''; $('hPass').type = 'password';
+    keepAwake(true);
+    hostOpenPeer();
+  } catch (e) { console.error(e); roomMsg(e.message || 'Không tạo được phòng.', 'err'); }
+  finally { roomBusy = false; updateRoomUi(); }
+}
+function hostOpenPeer() {
+  const h = host; if (!h) return;
+  setRoomState('Đang đăng ký phòng với máy chủ trung gian…', 'busy');
+  const peer = new Peer(PEER_PREFIX + h.code, { config: iceConfig(), debug: 1 });
+  h.peer = peer;
+  peer.on('open', () => { if (host !== h || h.peer !== peer) return; h.retries = 0; updateHostState(); roomMsg('Phòng đã mở. Gửi link và mật khẩu cho người xem.', 'ok'); });
+  peer.on('connection', conn => onViewerConn(h, conn));
+  peer.on('disconnected', () => {
+    if (host !== h || h.peer !== peer || peer.destroyed) return;
+    setRoomState('Mất kết nối máy chủ trung gian, đang thử lại…', 'busy');
+    clearTimeout(h.retryT);
+    h.retryT = setTimeout(() => { if (host === h && h.peer === peer && !peer.destroyed && peer.disconnected) try { peer.reconnect(); } catch {} }, 3000);
+  });
+  peer.on('error', err => {
+    if (host !== h || h.peer !== peer) return;
+    console.warn('peer error', err.type, err);
+    clearTimeout(h.retryT);
+    if (err.type === 'unavailable-id') {
+      if (h.retries++ < 8) {
+        setRoomState('Mã phòng cũ chưa được giải phóng, đang thử lại…', 'busy');
+        try { peer.destroy(); } catch {}
+        h.retryT = setTimeout(hostOpenPeer, 5000);
+      } else { hostShutdown('Chưa kết nối'); roomMsg('Mã phòng đang được dùng ở nơi khác. Bấm “Mã mới” rồi tạo lại.', 'err'); }
+      return;
+    }
+    if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
+      setRoomState('Lỗi mạng tới máy chủ trung gian, đang thử lại…', 'busy');
+      h.retryT = setTimeout(() => { if (host !== h) return; try { peer.destroy(); } catch {} hostOpenPeer(); }, 5000);
+      return;
+    }
+    roomMsg('Lỗi kết nối: ' + err.type, 'err');
+  });
+}
+function onViewerConn(h, conn) {
+  if (host !== h || h.conns.size >= 6) { try { conn.close(); } catch {} return; }
+  const st = { authed: false, tried: false, lastSeen: Date.now(), nonce: randStr(32, '0123456789abcdef') };
+  h.conns.set(conn, st);
+  const kill = () => { try { conn.close(); } catch {} };
+  const timer = setTimeout(() => { if (!st.authed) kill(); }, AUTH_TIMEOUT);
+  const deny = r => { try { conn.send({ t: 'deny', r }); } catch {} setTimeout(kill, 300); };
+  const drop = () => {
+    clearTimeout(timer); h.conns.delete(conn);
+    const c = h.calls.get(conn); if (c) { try { c.close(); } catch {} h.calls.delete(conn); }
+    if (host === h) updateHostState();
+  };
+  conn.on('open', () => { if (Date.now() < h.lockUntil) return deny('locked'); conn.send({ t: 'hello', nonce: st.nonce }); });
+  conn.on('close', drop); conn.on('error', drop);
+  conn.on('data', async d => {
+    if (!d || typeof d !== 'object') return;
+    st.lastSeen = Date.now();
+    if (d.t === 'ping') { if (st.authed) conn.send({ t: 'pong' }); return; }
+    if (d.t !== 'auth' || st.tried || st.authed) return;
+    st.tried = true;
+    if (Date.now() < h.lockUntil) return deny('locked');
+    let ok = false;
+    if (typeof d.mac === 'string' && d.mac.length === 64) ok = safeEq(await hmacHex(h.keyHex, st.nonce + ':' + h.code), d.mac);
+    if (host !== h) return;
+    if (!ok) {
+      const now = Date.now();
+      h.fails = h.fails.filter(x => now - x < 60000); h.fails.push(now);
+      if (h.fails.length >= 5) { h.lockUntil = now + 60000; h.fails = []; roomMsg('Có nhiều lần nhập sai mật khẩu. Phòng tạm khoá kết nối mới trong 60 giây.', 'err'); }
+      return deny('bad');
+    }
+    let n = 0; for (const s of h.conns.values()) if (s.authed) n++;
+    if (n >= MAX_VIEWERS) return deny('full');
+    st.authed = true;
+    conn.send({ t: 'ok', ntfy: net.ntfy && net.ntfyTopic ? net.ntfyTopic : null });
+    conn.send({ t: 'hist', events: eventLog.slice(0, 10) });
+    if (!stream) return deny('nocam');
+    const call = h.peer.call(conn.peer, stream);   // chỉ phát hình SAU khi xác thực thành công
+    h.calls.set(conn, call);
+    call.on('close', () => h.calls.delete(conn)); call.on('error', e => console.warn('call', e));
+    capBitrate(call); updateHostState();
+  });
+}
+function capBitrate(call) {   // giới hạn ~700 kbps để đỡ tốn dữ liệu di động
+  setTimeout(() => {
+    try {
+      call.peerConnection.getSenders().forEach(s => {
+        if (!s.track || s.track.kind !== 'video') return;
+        const p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+        p.encodings[0].maxBitrate = 700000; s.setParameters(p);
+      });
+    } catch (e) { console.warn('bitrate', e); }
+  }, 1000);
+}
+function hostHeartbeat() {
+  const h = host; if (!h || document.hidden) return;
+  const now = Date.now();
+  for (const [c, s] of h.conns) if (s.authed && now - s.lastSeen > DEAD_MS) try { c.close(); } catch {}
+}
+function hostBroadcast(msg) {
+  if (!host) return;
+  for (const [c, s] of host.conns) if (s.authed) try { c.send(msg); } catch (e) { console.warn(e); }
+}
+function updateHostState() {
+  const h = host; if (!h || !h.peer || !h.peer.open) return;
+  let n = 0; for (const s of h.conns.values()) if (s.authed) n++;
+  setRoomState(n ? `Đang phát hình cho ${n} thiết bị xem` : 'Phòng đã mở, đang chờ thiết bị xem', 'ok');
+}
+// Đóng phòng ngay: ngắt mọi người xem, huỷ đăng ký với máy chủ trung gian.
+function hostShutdown(stateText) {
+  const h = host; if (!h) return;
+  host = null;
+  clearInterval(h.hb); clearTimeout(h.retryT);
+  for (const [c] of h.conns) try { c.send({ t: 'bye' }); } catch {}
+  for (const [, call] of h.calls) try { call.close(); } catch {}
+  setTimeout(() => { try { h.peer && h.peer.destroy(); } catch {} }, 150);
+  keepAwake(false);
+  setRoomState(stateText || 'Chưa kết nối', 'idle');
+  updateRoomUi();
+}
+
+/* ---------- MÁY XEM ---------- */
+async function viewStart() {
+  if (host || view || roomBusy) return;
+  if (!secureOk()) return roomMsg('Cần mở trang qua HTTPS để dùng phòng giám sát.', 'err');
+  if (typeof Peer === 'undefined') return roomMsg('Không tải được thư viện kết nối (PeerJS). Kiểm tra mạng rồi tải lại trang.', 'err');
+  if (cameraOn) return roomMsg('Hãy tắt camera trên máy này trước khi chuyển sang chế độ xem.', 'err');
+  const code = $('vCode').value.trim().toLowerCase(), pw = $('vPass').value;
+  if (!validCode(code)) return roomMsg('Mã phòng không hợp lệ.', 'err');
+  if (!pw) return roomMsg('Nhập mật khẩu phòng.', 'err');
+  roomBusy = true; updateRoomUi(); roomMsg('Đang kết nối…');
+  try {
+    ensureAudio();
+    const keyHex = await deriveKeyHex(pw, code);
+    view = { code, keyHex, stopped: false, attempt: 0, authed: false, retrying: false, peer: null, conn: null, call: null, ping: null, retryT: null, lastPong: 0 };
+    saveJson(VIEW_KEY, { code });
+    $('vPass').value = '';
+    eventLog = []; renderLog(); rstat('Đang kết nối…', 'busy'); roomMsg('');
+    viewConnect();
+  } catch (e) { console.error(e); roomMsg(e.message || 'Không kết nối được.', 'err'); }
+  finally { roomBusy = false; updateRoomUi(); }
+}
+function viewCleanup(v) {
+  clearInterval(v.ping); v.ping = null; v.authed = false;
+  const { peer, conn, call } = v; v.peer = v.conn = v.call = null;
+  remote.srcObject = null;
+  for (const x of [call, conn, peer]) try { x && (x.destroy || x.close).call(x); } catch {}
+}
+function viewConnect() {
+  const v = view; if (!v || v.stopped) return;
+  viewCleanup(v); v.retrying = false;
+  setRoomState('Đang kết nối tới phòng…', 'busy'); rstat('Đang kết nối…', 'busy');
+  let peer;
+  try { peer = new Peer({ config: iceConfig(), debug: 1 }); } catch { return viewRetry(v, 'Không khởi tạo được kết nối.'); }
+  v.peer = peer;
+  const current = () => view === v && v.peer === peer;
+  peer.on('open', () => {
+    if (!current()) return;
+    const conn = peer.connect(PEER_PREFIX + v.code, { reliable: true });
+    v.conn = conn; wireViewerConn(v, conn);
+  });
+  peer.on('call', call => {
+    if (!current() || !v.authed || call.peer !== PEER_PREFIX + v.code) { try { call.close(); } catch {} return; }
+    call.answer(); v.call = call;
+    call.on('stream', s => { if (!current()) return; remote.srcObject = s; remote.play().catch(() => {}); setRoomState('Đang xem trực tiếp', 'ok'); rstat('', 'ok'); });
+    call.on('close', () => { if (current() && v.call === call) viewRetry(v, 'Camera ngừng phát hình.'); });
+  });
+  peer.on('disconnected', () => { if (current() && !peer.destroyed) try { peer.reconnect(); } catch {} });
+  peer.on('error', err => {
+    if (!current()) return;
+    console.warn('peer error', err.type);
+    viewRetry(v, err.type === 'peer-unavailable' ? 'Không thấy phòng này (camera chưa mở phòng hoặc sai mã).' : `Lỗi kết nối (${err.type}).`);
+  });
+}
+function wireViewerConn(v, conn) {
+  conn.on('data', async d => {
+    if (view !== v || v.conn !== conn || !d || typeof d !== 'object') return;
+    switch (d.t) {
+      case 'hello':
+        if (typeof d.nonce === 'string' && d.nonce.length <= 64) conn.send({ t: 'auth', mac: await hmacHex(v.keyHex, d.nonce + ':' + v.code) });
+        break;
+      case 'ok':
+        v.authed = true; v.attempt = 0; v.lastPong = Date.now();
+        setRoomState('Đã xác thực, đang chờ hình ảnh…', 'busy'); rstat('Đã xác thực, đang chờ hình ảnh…', 'busy');
+        showNtfyForViewer(d.ntfy);
+        clearInterval(v.ping); v.ping = setInterval(() => viewPing(v, conn), PING_MS);
+        break;
+      case 'pong': v.lastPong = Date.now(); break;
+      case 'hist': if (Array.isArray(d.events)) { eventLog = d.events.map(cleanEvent).filter(Boolean).slice(0, MAX_EVENTS); renderLog(); } break;
+      case 'alert': { const ev = cleanEvent(d.ev); if (ev) onRemoteAlert(ev); break; }
+      case 'deny':
+        viewStop(d.r === 'bad' ? 'Sai mật khẩu hoặc mã phòng.' : d.r === 'locked' ? 'Phòng tạm khoá do nhập sai nhiều lần. Thử lại sau 1 phút.' : d.r === 'full' ? 'Phòng đã đủ số thiết bị xem.' : 'Camera chưa sẵn sàng.', 'err');
+        break;
+      case 'bye': viewStop('Camera đã đóng phòng.', 'err'); break;
+    }
+  });
+  conn.on('close', () => { if (view === v && v.conn === conn && !v.stopped) viewRetry(v, 'Mất kết nối với camera.'); });
+  conn.on('error', e => console.warn('conn', e));
+}
+function viewPing(v, conn) {
+  if (view !== v || v.conn !== conn) return;
+  try { conn.send({ t: 'ping' }); } catch {}
+  if (!document.hidden && Date.now() - v.lastPong > DEAD_MS) viewRetry(v, 'Mất tín hiệu từ camera.');
+}
+function viewRetry(v, reason) {
+  if (view !== v || v.stopped || v.retrying) return;
+  v.retrying = true; viewCleanup(v);
+  v.attempt++;
+  const wait = Math.min(30, 2 * v.attempt);
+  setRoomState(`${reason} Thử lại sau ${wait} giây…`, 'err'); rstat(`${reason} Đang thử lại…`, 'err');
+  clearTimeout(v.retryT); v.retryT = setTimeout(viewConnect, wait * 1000);
+}
+function viewStop(msg, kind) {
+  const v = view; if (!v) return;
+  v.stopped = true; clearTimeout(v.retryT); viewCleanup(v);
+  view = null; clearTimeout(rAlertT);
+  $('rAlert').hidden = true; $('remoteStage').classList.remove('alarm'); $('vNtfy').textContent = '';
+  eventLog = loadEvents(); renderLog();
+  setRoomState('Chưa kết nối', 'idle'); roomMsg(msg || 'Đã ngắt kết nối.', kind || '');
+  updateRoomUi();
+}
+function onRemoteAlert(ev) {
+  eventLog.unshift(ev); if (eventLog.length > MAX_EVENTS) eventLog.length = MAX_EVENTS;
+  renderLog();
+  const b = $('rAlert'); b.textContent = 'CẢNH BÁO: ' + ev.text; b.hidden = false;
+  $('remoteStage').classList.add('alarm');
+  clearTimeout(rAlertT); rAlertT = setTimeout(() => { b.hidden = true; $('remoteStage').classList.remove('alarm'); }, 10000);
+  if (alertCfg.sound) { beep(); if (navigator.vibrate) navigator.vibrate([200, 100, 200]); }
+  notifyLocal(ev);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (host && !wakeLock) keepAwake(true);
+  if (view && view.authed && Date.now() - view.lastPong > DEAD_MS) viewRetry(view, 'Mất tín hiệu từ camera.');
+});
+
+/* ---------- Nối giao diện ---------- */
+(function initRoomUi() {
+  const saved = loadJson(ROOM_KEY, null);
+  const hasSaved = saved && validCode(saved.code || '') && /^[0-9a-f]{64}$/.test(saved.keyHex || '');
+  $('hCode').value = hasSaved ? saved.code : randStr(10, CODE_CHARS);
+  $('hRemember').checked = !!hasSaved;
+  const m = location.hash.match(/room=([a-z0-9]{8,20})/i);
+  const lastView = loadJson(VIEW_KEY, {});
+  $('vCode').value = m ? m[1].toLowerCase() : (validCode(lastView.code || '') ? lastView.code : '');
+  showTab(m ? 'view' : 'host');
+  try { const f = localStorage.getItem(FACING_KEY); if (f === 'environment' || f === 'user') $('facing').value = f; } catch {}
+  $('turnUrl').value = net.turnUrl; $('turnUser').value = net.turnUser; $('turnPass').value = net.turnPass;
+  $('ntfyOn').checked = !!net.ntfy; renderNtfyInfo();
+  $('tabHost').onclick = () => showTab('host'); $('tabView').onclick = () => showTab('view');
+  $('hNewCode').onclick = () => { $('hCode').value = randStr(10, CODE_CHARS); $('hRemember').checked = false; roomMsg('Đã tạo mã phòng mới. Nhớ nhập mật khẩu.'); };
+  $('hGen').onclick = () => { $('hPass').type = 'text'; $('hPass').value = randStr(14, PASS_CHARS); roomMsg('Hãy ghi lại mật khẩu này để gửi cho người xem. Nó sẽ bị ẩn sau khi tạo phòng.', 'ok'); };
+  $('hStart').onclick = hostStart;
+  $('hStop').onclick = () => { hostShutdown('Chưa kết nối'); if (cameraOn) stopCamera(); roomMsg('Đã ngắt kết nối và tắt camera.', 'ok'); };
+  $('hCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText($('hLink').value); roomMsg('Đã sao chép link (chưa gồm mật khẩu).', 'ok'); }
+    catch { $('hLink').select(); roomMsg('Hãy giữ và chọn “Sao chép” trên ô link.', ''); }
+  };
+  $('vStart').onclick = viewStart;
+  $('vStop').onclick = () => viewStop('Đã ngắt kết nối.', 'ok');
+  $('notifBtn').onclick = enableNotifs;
+  $('facing').onchange = () => { try { localStorage.setItem(FACING_KEY, $('facing').value); } catch {} if (cameraOn) roomMsg('Camera trước/sau sẽ áp dụng ở lần bật camera kế tiếp.', ''); };
+  $('ntfyOn').onchange = () => {
+    net.ntfy = $('ntfyOn').checked;
+    if (net.ntfy && !net.ntfyTopic) net.ntfyTopic = 'fcam-' + randStr(24, 'abcdefghijklmnopqrstuvwxyz0123456789');
+    saveJson(NET_KEY, net); renderNtfyInfo();
+  };
+  $('netSave').onclick = () => {
+    const urls = $('turnUrl').value.split(',').map(s => s.trim()).filter(Boolean);
+    if (urls.some(u => !/^turns?:/i.test(u))) return roomMsg('Địa chỉ TURN phải bắt đầu bằng turn: hoặc turns:.', 'err');
+    net.turnUrl = urls.join(','); net.turnUser = $('turnUser').value.trim(); net.turnPass = $('turnPass').value;
+    saveJson(NET_KEY, net); roomMsg('Đã lưu cấu hình TURN. Áp dụng ở lần tạo / tham gia phòng kế tiếp.', 'ok');
+  };
+  $('clearLog').onclick = () => {
+    if (view || !confirm('Xoá toàn bộ lịch sử sự kiện và ảnh chụp đã lưu trên máy này?')) return;
+    eventLog = []; persistEvents(); renderLog();
+  };
+  updateRoomUi();
+})();
+
 /* ---------- Khởi động ---------- */
 camBtn.onclick = async () => {
   ensureAudio();
@@ -624,7 +1235,7 @@ saveBtn.onclick = saveFace;
 nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveFace(); });
 window.addEventListener('pagehide', releaseStream);
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, ensureAudio, { once: true }));
-for (const [id, key] of [['alertBlocked', 'blocked'], ['alertStranger', 'stranger'], ['alertSound', 'sound']]) {
+for (const [id, key] of [['alertBlocked', 'blocked'], ['alertStranger', 'stranger'], ['alertSound', 'sound'], ['alertSnap', 'snap']]) {
   const el = $(id);
   el.checked = !!alertCfg[key];
   el.onchange = () => {
@@ -643,7 +1254,6 @@ renderThreshold();
 renderList();
 rebuildIndex();
 updateUi();
-loadModels().then(ok => { if (ok) startCamera(); });
 </script>
 </body>
 </html>
